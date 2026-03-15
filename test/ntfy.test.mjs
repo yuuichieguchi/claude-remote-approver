@@ -11,7 +11,7 @@
 
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
-import { sendNotification, waitForResponse, formatToolInfo, stripMarkdown, buildAuthHeader } from "../src/ntfy.mjs";
+import { sendNotification, deleteNotification, waitForResponse, formatToolInfo, stripMarkdown, buildAuthHeader } from "../src/ntfy.mjs";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -261,8 +261,8 @@ describe("sendNotification", () => {
       requestId: "req-007",
     });
 
-    assert.ok(result, "should return a response object");
-    assert.equal(result.status, 200);
+    assert.ok(result, "should return a result object");
+    assert.equal(result.messageId, "abc123");
   });
 
   it("should throw when fetch returns non-ok status", async () => {
@@ -349,6 +349,98 @@ describe("sendNotification", () => {
       headers.Authorization,
       undefined,
       "Authorization header should not be present when auth is not provided"
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deleteNotification
+// ---------------------------------------------------------------------------
+
+describe("deleteNotification", () => {
+  let originalFetch;
+  beforeEach(() => { originalFetch = globalThis.fetch; });
+  afterEach(() => { globalThis.fetch = originalFetch; });
+
+  it("should be a function exported from the module", () => {
+    assert.equal(typeof deleteNotification, "function");
+  });
+
+  it("should send DELETE to {server}/{topic}/{messageId}", async () => {
+    const mockFetch = createMockFetch({}, 200);
+    globalThis.fetch = mockFetch;
+
+    await deleteNotification({
+      server: "https://ntfy.sh",
+      topic: "test-topic",
+      messageId: "msg-123",
+    });
+
+    assert.equal(mockFetch.calls.length, 1);
+    assert.equal(mockFetch.calls[0].url, "https://ntfy.sh/test-topic/msg-123");
+    assert.equal(mockFetch.calls[0].options.method, "DELETE");
+  });
+
+  it("should strip trailing slash from server URL", async () => {
+    const mockFetch = createMockFetch({}, 200);
+    globalThis.fetch = mockFetch;
+
+    await deleteNotification({
+      server: "https://ntfy.sh/",
+      topic: "my-topic",
+      messageId: "msg-456",
+    });
+
+    assert.equal(mockFetch.calls[0].url, "https://ntfy.sh/my-topic/msg-456");
+  });
+
+  it("should include Authorization header when auth is provided", async () => {
+    const mockFetch = createMockFetch({}, 200);
+    globalThis.fetch = mockFetch;
+
+    await deleteNotification({
+      server: "https://ntfy.sh",
+      topic: "test-topic",
+      messageId: "msg-auth",
+      auth: { username: "myuser", password: "mypass" },
+    });
+
+    const headers = mockFetch.calls[0].options.headers;
+    assert.equal(
+      headers.Authorization,
+      `Basic ${btoa("myuser:mypass")}`,
+    );
+  });
+
+  it("should NOT include Authorization header when auth is not provided", async () => {
+    const mockFetch = createMockFetch({}, 200);
+    globalThis.fetch = mockFetch;
+
+    await deleteNotification({
+      server: "https://ntfy.sh",
+      topic: "test-topic",
+      messageId: "msg-noauth",
+    });
+
+    const headers = mockFetch.calls[0].options.headers;
+    assert.equal(headers.Authorization, undefined);
+  });
+
+  it("should throw when fetch returns non-ok status", async () => {
+    const mockFetch = createMockFetch({}, 404);
+    globalThis.fetch = mockFetch;
+
+    await assert.rejects(
+      () => deleteNotification({
+        server: "https://ntfy.sh",
+        topic: "test-topic",
+        messageId: "msg-gone",
+      }),
+      (err) => {
+        assert.ok(err instanceof Error);
+        assert.ok(err.message.includes("HTTP 404"));
+        return true;
+      }
     );
   });
 });

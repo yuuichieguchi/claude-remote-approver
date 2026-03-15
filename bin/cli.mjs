@@ -195,7 +195,7 @@ if (isMain) {
   const { loadConfig, saveConfig, generateTopic, resolveAuth } = await import(
     "../src/config.mjs"
   );
-  const { sendNotification, waitForResponse, formatToolInfo } = await import(
+  const { sendNotification, deleteNotification, waitForResponse, formatToolInfo } = await import(
     "../src/ntfy.mjs"
   );
   const { processHook } = await import("../src/hook.mjs");
@@ -218,6 +218,7 @@ if (isMain) {
     generateTopic,
     resolveAuth,
     sendNotification,
+    deleteNotification,
     waitForResponse,
     formatToolInfo,
     processHook,

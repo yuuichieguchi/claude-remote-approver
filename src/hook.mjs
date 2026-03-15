@@ -137,6 +137,7 @@ export async function processAskUserQuestion(input, deps) {
       batches.push(options.slice(j, j + MAX_BUTTONS));
     }
 
+    const messageIds = [];
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
       const batchInfo = batches.length > 1 ? `(${i + 1}/${batches.length})` : undefined;
@@ -153,6 +154,7 @@ export async function processAskUserQuestion(input, deps) {
         ...(auth && { auth }),
       });
       if (!sent) return ASK;
+      if (sent?.messageId) messageIds.push(sent.messageId);
     }
 
     // AskUserQuestion uses standard timeout (not planTimeout)
@@ -168,6 +170,16 @@ export async function processAskUserQuestion(input, deps) {
     } catch (err) {
       console.error("[claude-remote-approver] Response listener failed:", err.message, "— Falling back to CLI.");
       return ASK;
+    }
+
+    if (deps.deleteNotification) {
+      for (const msgId of messageIds) {
+        try {
+          await deps.deleteNotification({ server: config.ntfyServer, topic: config.topic, messageId: msgId, ...(auth && { auth }) });
+        } catch (err) {
+          console.warn("[claude-remote-approver] Failed to dismiss notification:", err.message);
+        }
+      }
     }
 
     if (response.answer) {
@@ -203,7 +215,7 @@ export async function processAskUserQuestion(input, deps) {
  * @param {Function} deps.formatToolInfo
  * @returns {Promise<object>} Decision JSON
  */
-export async function processHook(input, { loadConfig, sendNotification, waitForResponse, formatToolInfo, resolveAuth }) {
+export async function processHook(input, { loadConfig, sendNotification, deleteNotification, waitForResponse, formatToolInfo, resolveAuth }) {
   const config = loadConfig();
 
   if (!config.topic) {
@@ -213,7 +225,7 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
   const auth = resolveAuth ? resolveAuth(config) : null;
 
   if (isAskUserQuestion(input)) {
-    return processAskUserQuestion(input, { loadConfig, sendNotification, waitForResponse, resolveAuth });
+    return processAskUserQuestion(input, { loadConfig, sendNotification, deleteNotification, waitForResponse, resolveAuth });
   }
 
   const requestId = crypto.randomUUID();
@@ -234,6 +246,8 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
   });
   if (!sent) return ASK;
 
+  const messageId = sent?.messageId;
+
   let response;
   try {
     const isPlanReview = input.tool_name === "ExitPlanMode";
@@ -248,6 +262,14 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
   } catch (err) {
     console.error("[claude-remote-approver] Response listener failed:", err.message, "— Falling back to CLI.");
     return ASK;
+  }
+
+  if (messageId && deleteNotification) {
+    try {
+      await deleteNotification({ server: config.ntfyServer, topic: config.topic, messageId, ...(auth && { auth }) });
+    } catch (err) {
+      console.warn("[claude-remote-approver] Failed to dismiss notification:", err.message);
+    }
   }
 
   if (response.timeout) {
