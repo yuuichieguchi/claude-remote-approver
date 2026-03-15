@@ -25,7 +25,34 @@ export async function sendNotification({ server, topic, title, message, actions,
     throw new Error(`ntfy notification failed: HTTP ${response.status}`);
   }
 
-  return response;
+  let messageId;
+  try {
+    const body = await response.json();
+    messageId = body.id;
+  } catch {
+    // ignore parse errors
+  }
+
+  return { messageId };
+}
+
+/**
+ * Delete a notification from ntfy server cache.
+ *
+ * @param {{ server: string, topic: string, messageId: string, auth?: { username: string, password: string } }} params
+ */
+export async function deleteNotification({ server, topic, messageId, auth }) {
+  const baseUrl = server.replace(/\/+$/, '');
+  const url = `${baseUrl}/${topic}/${messageId}`;
+
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers: buildAuthHeader(auth),
+  });
+
+  if (!response.ok) {
+    throw new Error(`ntfy delete failed: HTTP ${response.status}`);
+  }
 }
 
 /**

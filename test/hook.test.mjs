@@ -210,7 +210,8 @@ describe("processHook", () => {
 
     return {
       loadConfig: mock.fn(() => overrides.config ?? defaultConfig),
-      sendNotification: mock.fn(async () => ({ ok: true, status: 200 })),
+      sendNotification: mock.fn(async () => ({ messageId: "msg-001" })),
+      deleteNotification: mock.fn(async () => {}),
       waitForResponse: mock.fn(
         async () => overrides.waitResult ?? { approved: true }
       ),
@@ -848,6 +849,67 @@ describe("processHook", () => {
     }
   });
 
+  // ==================== deleteNotification ====================
+
+  it("should call deleteNotification with messageId after response", async () => {
+    const deps = createDeps({ waitResult: { approved: true } });
+
+    await processHook(sampleInput, deps);
+
+    assert.equal(deps.deleteNotification.mock.callCount(), 1);
+    const callArgs = deps.deleteNotification.mock.calls[0].arguments[0];
+    assert.equal(callArgs.server, "https://ntfy.sh");
+    assert.equal(callArgs.topic, "test-topic");
+    assert.equal(callArgs.messageId, "msg-001");
+  });
+
+  it("should pass auth to deleteNotification when resolveAuth returns credentials", async () => {
+    const auth = { username: "myuser", password: "mypass" };
+    const deps = createDeps({ waitResult: { approved: true } });
+    deps.resolveAuth = mock.fn(() => auth);
+
+    await processHook(sampleInput, deps);
+
+    assert.equal(deps.deleteNotification.mock.callCount(), 1);
+    const callArgs = deps.deleteNotification.mock.calls[0].arguments[0];
+    assert.deepEqual(callArgs.auth, auth);
+  });
+
+  it("should not call deleteNotification when messageId is undefined", async () => {
+    const deps = createDeps({ waitResult: { approved: true } });
+    deps.sendNotification = mock.fn(async () => ({ messageId: undefined }));
+
+    await processHook(sampleInput, deps);
+
+    assert.equal(deps.deleteNotification.mock.callCount(), 0);
+  });
+
+  it("should not fail when deleteNotification throws", async () => {
+    const deps = createDeps({ waitResult: { approved: true } });
+    deps.deleteNotification = mock.fn(async () => { throw new Error("delete failed"); });
+
+    const result = await processHook(sampleInput, deps);
+
+    assert.deepEqual(result, {
+      hookSpecificOutput: {
+        hookEventName: "PermissionRequest",
+        decision: { behavior: "allow" },
+      },
+    });
+  });
+
+  it("should still call deleteNotification when response times out", async () => {
+    const deps = createDeps({ waitResult: { timeout: true } });
+    const errorSpy = mock.method(console, "error", () => {});
+    try {
+      await processHook(sampleInput, deps);
+    } finally {
+      errorSpy.mock.restore();
+    }
+
+    assert.equal(deps.deleteNotification.mock.callCount(), 1, "should still attempt to dismiss the notification on timeout");
+  });
+
   it("should work without auth when resolveAuth returns null", async () => {
     const deps = createDeps();
     deps.resolveAuth = mock.fn(() => null);
@@ -1400,6 +1462,162 @@ describe("processAskUserQuestion", () => {
       errorSpy.mock.restore();
       _internal.delay = originalDelay;
     }
+  });
+
+  // ==================== deleteNotification ====================
+
+  it("should call deleteNotification with collected messageIds after response", async () => {
+    const input = {
+      tool_name: "AskUserQuestion",
+      tool_input: {
+        questions: [{
+          question: "Which?",
+          header: "Q",
+          options: [{ label: "A", description: "a" }, { label: "B", description: "b" }],
+          multiSelect: false,
+        }],
+      },
+    };
+    const deps = {
+      loadConfig: mock.fn(() => ({
+        topic: "test-topic",
+        ntfyServer: "https://ntfy.sh",
+        timeout: 120,
+      })),
+      sendNotification: mock.fn(async () => ({ messageId: "msg-q1" })),
+      deleteNotification: mock.fn(async () => {}),
+      waitForResponse: mock.fn(async () => ({ answer: "A" })),
+    };
+
+    await processAskUserQuestion(input, deps);
+
+    assert.equal(deps.deleteNotification.mock.callCount(), 1);
+    const callArgs = deps.deleteNotification.mock.calls[0].arguments[0];
+    assert.equal(callArgs.messageId, "msg-q1");
+    assert.equal(callArgs.server, "https://ntfy.sh");
+    assert.equal(callArgs.topic, "test-topic");
+  });
+
+  it("should delete all batch messageIds for multi-batch questions", async () => {
+    const input = {
+      tool_name: "AskUserQuestion",
+      tool_input: {
+        questions: [{
+          question: "Pick one",
+          header: "Q",
+          options: [
+            { label: "A", description: "a" },
+            { label: "B", description: "b" },
+            { label: "C", description: "c" },
+            { label: "D", description: "d" },
+          ],
+          multiSelect: false,
+        }],
+      },
+    };
+    let callCount = 0;
+    const deps = {
+      loadConfig: mock.fn(() => ({
+        topic: "test-topic",
+        ntfyServer: "https://ntfy.sh",
+        timeout: 120,
+      })),
+      sendNotification: mock.fn(async () => {
+        callCount++;
+        return { messageId: `msg-batch-${callCount}` };
+      }),
+      deleteNotification: mock.fn(async () => {}),
+      waitForResponse: mock.fn(async () => ({ answer: "C" })),
+    };
+
+    await processAskUserQuestion(input, deps);
+
+    assert.equal(deps.deleteNotification.mock.callCount(), 2);
+    assert.equal(deps.deleteNotification.mock.calls[0].arguments[0].messageId, "msg-batch-1");
+    assert.equal(deps.deleteNotification.mock.calls[1].arguments[0].messageId, "msg-batch-2");
+  });
+
+  it("should not fail when deleteNotification throws in processAskUserQuestion", async () => {
+    const input = {
+      tool_name: "AskUserQuestion",
+      tool_input: {
+        questions: [{
+          question: "Which?",
+          header: "Q",
+          options: [{ label: "A", description: "a" }],
+          multiSelect: false,
+        }],
+      },
+    };
+    const deps = {
+      loadConfig: mock.fn(() => ({
+        topic: "test-topic",
+        ntfyServer: "https://ntfy.sh",
+        timeout: 120,
+      })),
+      sendNotification: mock.fn(async () => ({ messageId: "msg-x" })),
+      deleteNotification: mock.fn(async () => { throw new Error("delete failed"); }),
+      waitForResponse: mock.fn(async () => ({ answer: "A" })),
+    };
+
+    const result = await processAskUserQuestion(input, deps);
+
+    assert.equal(result.hookSpecificOutput.decision.behavior, "allow");
+  });
+
+  it("should skip deleteNotification when messageId is missing from sendNotification response", async () => {
+    const input = {
+      tool_name: "AskUserQuestion",
+      tool_input: {
+        questions: [{
+          question: "Which?",
+          header: "Q",
+          options: [{ label: "A", description: "a" }],
+          multiSelect: false,
+        }],
+      },
+    };
+    const deps = {
+      loadConfig: mock.fn(() => ({
+        topic: "test-topic",
+        ntfyServer: "https://ntfy.sh",
+        timeout: 120,
+      })),
+      sendNotification: mock.fn(async () => ({})),
+      deleteNotification: mock.fn(async () => {}),
+      waitForResponse: mock.fn(async () => ({ answer: "A" })),
+    };
+
+    await processAskUserQuestion(input, deps);
+
+    assert.equal(deps.deleteNotification.mock.callCount(), 0);
+  });
+
+  it("should still work when deleteNotification is not provided", async () => {
+    const input = {
+      tool_name: "AskUserQuestion",
+      tool_input: {
+        questions: [{
+          question: "Which?",
+          header: "Q",
+          options: [{ label: "A", description: "a" }],
+          multiSelect: false,
+        }],
+      },
+    };
+    const deps = {
+      loadConfig: mock.fn(() => ({
+        topic: "test-topic",
+        ntfyServer: "https://ntfy.sh",
+        timeout: 120,
+      })),
+      sendNotification: mock.fn(async () => ({ messageId: "msg-y" })),
+      waitForResponse: mock.fn(async () => ({ answer: "A" })),
+    };
+
+    const result = await processAskUserQuestion(input, deps);
+
+    assert.equal(result.hookSpecificOutput.decision.behavior, "allow");
   });
 
   // ==================== Auth threading (Basic Auth) ====================
