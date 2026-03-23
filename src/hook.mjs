@@ -124,6 +124,7 @@ export async function processAskUserQuestion(input, deps) {
   if (!config.topic) return ASK;
 
   const auth = deps.resolveAuth ? deps.resolveAuth(config) : null;
+  const titlePrefix = config.title;
   const questions = input.tool_input.questions;
   const answers = {};
 
@@ -146,7 +147,7 @@ export async function processAskUserQuestion(input, deps) {
       const sent = await sendWithRetry(deps.sendNotification, {
         server: config.ntfyServer,
         topic: config.topic,
-        title: `Claude Code: ${q.header || "Question"}`,
+        title: `${titlePrefix}: ${q.header || "Question"}`,
         message,
         actions,
         requestId,
@@ -217,7 +218,7 @@ export async function processHook(input, { loadConfig, sendNotification, waitFor
   }
 
   const requestId = crypto.randomUUID();
-  const { title, message } = formatToolInfo(input);
+  const { title, message } = formatToolInfo(input, { titlePrefix: config.title });
   const actions = buildActions(config.ntfyServer, config.topic, requestId, {
     permissionSuggestions: input.permission_suggestions,
     ...(auth && { auth }),

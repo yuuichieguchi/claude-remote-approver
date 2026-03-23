@@ -82,6 +82,7 @@ export async function main(args, deps) {
 
     case "status": {
       const config = deps.loadConfig();
+      deps.stdout.write(`Title:   ${config.title}\n`);
       deps.stdout.write(`Topic:   ${config.topic}\n`);
       deps.stdout.write(`Server:  ${config.ntfyServer}\n`);
       deps.stdout.write(`Timeout: ${config.timeout}s\n`);

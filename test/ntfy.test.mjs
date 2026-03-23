@@ -1030,6 +1030,41 @@ describe("formatToolInfo", () => {
     assert.equal(result.title, "Claude Code: Plan Review");
     assert.equal(result.message, "(empty plan)");
   });
+
+  // ==================== Custom titlePrefix ====================
+
+  it("should use custom titlePrefix for tool notifications", () => {
+    const result = formatToolInfo(
+      { hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "ls" } },
+      { titlePrefix: "My Claude" },
+    );
+    assert.equal(result.title, "My Claude: Bash");
+  });
+
+  it("should use custom titlePrefix for plan review notifications", () => {
+    const result = formatToolInfo(
+      { hook_event_name: "PermissionRequest", tool_name: "ExitPlanMode", tool_input: { plan: "do stuff" } },
+      { titlePrefix: "Work PC" },
+    );
+    assert.equal(result.title, "Work PC: Plan Review");
+  });
+
+  it("should fall back to 'Claude Code' when titlePrefix is not provided", () => {
+    const result = formatToolInfo({
+      hook_event_name: "PreToolUse",
+      tool_name: "Read",
+      tool_input: { file_path: "/tmp/test" },
+    });
+    assert.equal(result.title, "Claude Code: Read");
+  });
+
+  it("should use empty titlePrefix literally when explicitly passed", () => {
+    const result = formatToolInfo(
+      { hook_event_name: "PreToolUse", tool_name: "Write", tool_input: { file_path: "/tmp/x" } },
+      { titlePrefix: "" },
+    );
+    assert.equal(result.title, ": Write");
+  });
 });
 
 // ---------------------------------------------------------------------------

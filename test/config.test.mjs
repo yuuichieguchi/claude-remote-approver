@@ -91,6 +91,10 @@ describe("DEFAULT_CONFIG", () => {
   it("should have ntfyPassword as empty string", () => {
     assert.equal(DEFAULT_CONFIG.ntfyPassword, "");
   });
+
+  it("should have title as 'Claude Code'", () => {
+    assert.equal(DEFAULT_CONFIG.title, "Claude Code");
+  });
 });
 
 // ==================== loadConfig ====================
@@ -127,6 +131,7 @@ describe("loadConfig", () => {
       autoDeny: [],
       ntfyUsername: "",
       ntfyPassword: "",
+      title: "Claude Code",
     });
   });
 
@@ -156,6 +161,7 @@ describe("loadConfig", () => {
       autoDeny: ["mcp__*"],
       ntfyUsername: "",
       ntfyPassword: "",
+      title: "My Claude",
     };
     fs.writeFileSync(tmpConfigPath, JSON.stringify(fullConfig, null, 2));
 
@@ -236,6 +242,24 @@ describe("loadConfig", () => {
     const config = loadConfig(tmpConfigPath);
     assert.equal(config.ntfyPassword, DEFAULT_CONFIG.ntfyPassword);
   });
+
+  it("should fall back to default title when title is not a string", () => {
+    fs.writeFileSync(tmpConfigPath, JSON.stringify({ title: 42 }));
+    const config = loadConfig(tmpConfigPath);
+    assert.equal(config.title, DEFAULT_CONFIG.title);
+  });
+
+  it("should fall back to default title when title is empty string", () => {
+    fs.writeFileSync(tmpConfigPath, JSON.stringify({ title: "" }));
+    const config = loadConfig(tmpConfigPath);
+    assert.equal(config.title, DEFAULT_CONFIG.title);
+  });
+
+  it("should accept a custom title string", () => {
+    fs.writeFileSync(tmpConfigPath, JSON.stringify({ title: "My Claude" }));
+    const config = loadConfig(tmpConfigPath);
+    assert.equal(config.title, "My Claude");
+  });
 });
 
 // ==================== saveConfig ====================
@@ -293,6 +317,7 @@ describe("saveConfig", () => {
       autoDeny: ["Bash(rm*)"],
       ntfyUsername: "",
       ntfyPassword: "",
+      title: "Claude Code",
     };
 
     saveConfig(original, tmpConfigPath);

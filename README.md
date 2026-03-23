@@ -200,6 +200,7 @@ Config file location: `~/.claude-remote-approver.json`
 | `autoDeny` | `string[]` | `[]` | Reserved for future use. |
 | `ntfyUsername` | `string` | `""` | Username for ntfy Basic Auth. Set this if your ntfy server requires authentication. |
 | `ntfyPassword` | `string` | `""` | Password for ntfy Basic Auth. Set this if your ntfy server requires authentication. |
+| `title` | `string` | `"Claude Code"` | Custom prefix for notification titles. Useful for distinguishing multiple instances (e.g. `"Claude (work)"`, `"Claude (personal)"`). |
 
 ### Using a self-hosted ntfy server
 

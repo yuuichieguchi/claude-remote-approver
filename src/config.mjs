@@ -15,6 +15,7 @@ export const DEFAULT_CONFIG = {
   autoDeny: [],
   ntfyUsername: "",
   ntfyPassword: "",
+  title: "Claude Code",
 };
 
 export function loadConfig(configPath = CONFIG_PATH) {
@@ -30,6 +31,7 @@ export function loadConfig(configPath = CONFIG_PATH) {
     if (!Array.isArray(config.autoDeny)) config.autoDeny = DEFAULT_CONFIG.autoDeny;
     if (typeof config.ntfyUsername !== "string") config.ntfyUsername = DEFAULT_CONFIG.ntfyUsername;
     if (typeof config.ntfyPassword !== "string") config.ntfyPassword = DEFAULT_CONFIG.ntfyPassword;
+    if (typeof config.title !== "string" || !config.title) config.title = DEFAULT_CONFIG.title;
     return config;
   } catch (err) {
     if (err.code === "ENOENT") {
