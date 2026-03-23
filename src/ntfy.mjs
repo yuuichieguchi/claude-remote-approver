@@ -446,18 +446,20 @@ function stripInline(text) {
  * Format tool information for display in the notification.
  *
  * @param {{ hook_event_name: string, tool_name: string, tool_input: Record<string, unknown> }} params
+ * @param {{ titlePrefix: string }} [options]
  * @returns {{ title: string, message: string }}
  */
-export function formatToolInfo({ hook_event_name, tool_name, tool_input }) {
+export function formatToolInfo({ hook_event_name, tool_name, tool_input }, { titlePrefix } = {}) {
+  const prefix = titlePrefix ?? 'Claude Code';
   let title;
   let message;
 
   if (tool_name === 'ExitPlanMode' && typeof tool_input?.plan === 'string') {
-    title = 'Claude Code: Plan Review';
+    title = `${prefix}: Plan Review`;
     const plain = tool_input.plan.trim() ? stripMarkdown(tool_input.plan) : '';
     message = plain || '(empty plan)';
   } else {
-    title = `Claude Code: ${tool_name}`;
+    title = `${prefix}: ${tool_name}`;
     switch (tool_name) {
       case 'Bash':
         message = tool_input?.command ?? JSON.stringify(tool_input);
