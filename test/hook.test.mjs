@@ -93,6 +93,16 @@ describe("buildActions", () => {
     assert.equal(actions[1].headers, undefined);
   });
 
+  it("should set clear:true on every action so iOS dismisses the notification on tap", () => {
+    const actions = buildActions("https://ntfy.sh", "my-topic", "req-006c", {
+      permissionSuggestions: [{ type: "toolAlwaysAllow", tool: "Bash" }],
+    });
+    assert.equal(actions.length, 3);
+    for (const a of actions) {
+      assert.equal(a.clear, true, `${a.label} action should have clear:true`);
+    }
+  });
+
   it("should include requestId and approved:true in Approve body", () => {
     const actions = buildActions("https://ntfy.sh", "my-topic", "req-007");
 
@@ -1021,6 +1031,17 @@ describe("buildQuestionActions", () => {
     const actions = buildQuestionActions("https://ntfy.sh", "my-topic", "req-1", options);
 
     assert.equal(actions[0].url, "https://ntfy.sh/my-topic-response");
+  });
+
+  it("should set clear:true on every action so iOS dismisses the notification on tap", () => {
+    const options = [
+      { label: "Yes", description: "" },
+      { label: "No", description: "" },
+    ];
+    const actions = buildQuestionActions("https://ntfy.sh", "topic", "req-1", options);
+    for (const a of actions) {
+      assert.equal(a.clear, true, `${a.label} action should have clear:true`);
+    }
   });
 
   // ==================== Auth (Basic Auth headers) ====================

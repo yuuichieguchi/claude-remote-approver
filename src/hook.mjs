@@ -31,6 +31,7 @@ export function buildActions(server, topic, requestId, { permissionSuggestions, 
       url,
       body: JSON.stringify({ requestId, approved: true }),
       method: "POST",
+      clear: true,
       ...(authHeaders && { headers: authHeaders }),
     },
     {
@@ -39,6 +40,7 @@ export function buildActions(server, topic, requestId, { permissionSuggestions, 
       url,
       body: JSON.stringify({ requestId, approved: false }),
       method: "POST",
+      clear: true,
       ...(authHeaders && { headers: authHeaders }),
     },
   ];
@@ -49,6 +51,7 @@ export function buildActions(server, topic, requestId, { permissionSuggestions, 
       url,
       body: JSON.stringify({ requestId, approved: true, alwaysAllow: true }),
       method: "POST",
+      clear: true,
       ...(authHeaders && { headers: authHeaders }),
     });
   }
@@ -97,6 +100,7 @@ export function buildQuestionActions(server, topic, requestId, options, { auth }
     url,
     body: JSON.stringify({ requestId, answer: opt.label }),
     method: "POST",
+    clear: true,
     ...(authHeaders && { headers: authHeaders }),
   }));
 }
